@@ -6,30 +6,14 @@ from flask import Flask, request, redirect, url_for, render_template, send_file,
 from werkzeug.utils import secure_filename
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.secret_key = '' # Secret Key Generated here. Use generatekey.py
+app.secret_key = ''
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['DOWNLOAD_FOLDER'] = 'downloads'
-app.config['SPOTIPY_CLIENT_ID'] = '' # Get this from the spotify developer dashboard
-app.config['SPOTIPY_CLIENT_SECRET'] = '' # Get this from the spotify developer dashboard
-app.config['SPOTIPY_REDIRECT_URI'] = 'http://localhost:5000/callback' # ADD this from the spotify developer dashboard
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///oauth_sessions.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-
-db = SQLAlchemy(app)
-
-class OAuthToken(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    access_token = db.Column(db.String(255), nullable=False)
-    refresh_token = db.Column(db.String(255), nullable=False)
-    expires_at = db.Column(db.Integer, nullable=False)
-
-    def as_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+app.config['SPOTIPY_CLIENT_ID'] = ''
+app.config['SPOTIPY_CLIENT_SECRET'] = ''
+app.config['SPOTIPY_REDIRECT_URI'] = 'http://localhost:5000/callback'
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['DOWNLOAD_FOLDER'], exist_ok=True)
@@ -38,33 +22,37 @@ sp_oauth = SpotifyOAuth(
     client_id=app.config['SPOTIPY_CLIENT_ID'],
     client_secret=app.config['SPOTIPY_CLIENT_SECRET'],
     redirect_uri=app.config['SPOTIPY_REDIRECT_URI'],
-    scope="user-read-private",
-    cache_path=None
+    scope="user-read-private"
 )
 
-with app.app_context():
-    db.create_all()
 
 def token_required(f):
     def decorated(*args, **kwargs):
-        username = request.args.get('username')
-        token_info = get_token(username)
+        token_info = get_token()
         if not token_info:
             return redirect(url_for('index'))
         return f(*args, **kwargs)
+
     return decorated
 
-def get_token(username):
-    token_info = OAuthToken.query.filter_by(username=username).first()
-    if token_info:
-        return token_info.as_dict()
-    return None
+
+def get_token():
+    token_info = session.get('token_info', None)
+    if not token_info:
+        return None
+    now = int(datetime.now().timestamp())
+    is_expired = token_info['expires_at'] - now < 60
+    if is_expired:
+        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+        session['token_info'] = token_info
+    return token_info
 
 
 def convert_timestamp(timestamp):
     utc_datetime = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%fZ')
     iso_timestamp = utc_datetime.strftime('%Y-%m-%dT%H:%M:%SZ')
     return iso_timestamp
+
 
 def extract_song_artist(entry):
     title = entry.get("title", "")
@@ -99,6 +87,7 @@ def extract_song_artist(entry):
 
     return song_title, artist_name
 
+
 def get_public_ip():
     try:
         response = requests.get('https://api.ipify.org?format=json')
@@ -106,6 +95,7 @@ def get_public_ip():
         return ip_data['ip']
     except requests.RequestException as e:
         return "Unknown"
+
 
 def process_watch_history(json_file, sp, username, ip_address):
     with open(json_file, 'r', encoding='utf-8') as file:
@@ -126,7 +116,6 @@ def process_watch_history(json_file, sp, username, ip_address):
         })
 
     output_file = os.path.join(app.config['DOWNLOAD_FOLDER'], f'{username}_spotify_history.json')
-    print(f"Creating output file for user: {username} at {output_file}")  # Debug print
     with open(output_file, 'w') as f:
         f.write("[\n")
 
@@ -186,50 +175,37 @@ def process_watch_history(json_file, sp, username, ip_address):
     return output_file
 
 
-
 @app.route('/')
 def index():
     auth_url = sp_oauth.get_authorize_url()
     return render_template('index.html', auth_url=auth_url)
 
+
 @app.route('/callback')
 def callback():
     code = request.args.get('code')
     token_info = sp_oauth.get_access_token(code)
-
+    session['token_info'] = token_info
     sp = spotipy.Spotify(auth=token_info['access_token'])
-    user_info = sp.current_user()
-    username = user_info['id']
 
-    token = OAuthToken.query.filter_by(username=username).first()
-    if not token:
-        token = OAuthToken(
-            username=username,
-            access_token=token_info['access_token'],
-            refresh_token=token_info['refresh_token'],
-            expires_at=token_info['expires_at']
-        )
-        db.session.add(token)
-    else:
-        token.access_token = token_info['access_token']
-        token.refresh_token = token_info['refresh_token']
-        token.expires_at = token_info['expires_at']
-    db.session.commit()
+    try:
+        user_info = sp.current_user()
+        username = user_info['id']
+        session['username'] = username
+    except spotipy.exceptions.SpotifyException as e:
+        return redirect(url_for('index'))
 
     return redirect('/upload')
-
-
 
 
 @app.route('/upload', methods=['GET', 'POST'])
 @token_required
 def upload_file():
-    token_info = get_token()
+    token_info = session.get('token_info')
     sp = spotipy.Spotify(auth=token_info['access_token'])
 
     username = session.get('username')
     ip_address = get_public_ip()
-    print(f"Processing upload for user: {username}")
 
     if request.method == 'POST':
         if 'file' not in request.files:
@@ -242,12 +218,9 @@ def upload_file():
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
             output_file = process_watch_history(file_path, sp, username, ip_address)
-            print(f"File processed for user: {username}, output: {output_file}")
             return send_file(output_file, as_attachment=True)
 
     return render_template('upload.html')
-
-
 
 
 if __name__ == '__main__':
