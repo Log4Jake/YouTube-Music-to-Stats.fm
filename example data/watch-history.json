@@ -1,0 +1,58 @@
+[
+  {
+    "header": "YouTube Music",
+    "title": "Watched No Time for Caution",
+    "titleUrl": "https://music.youtube.com/watch?v=2o9KfyPqQzY",
+    "subtitles": [
+      {
+        "name": "Hans Zimmer - Topic",
+        "url": "https://www.youtube.com/channel/UCfCNL5oajlQBAlyjWv1ChVw"
+      }
+    ],
+    "time": "2024-04-09T18:24:31.023Z",
+    "products": ["YouTube"],
+    "activityControls": ["YouTube watch history"]
+  },
+  {
+    "header": "YouTube Music",
+    "title": "Watched Flight",
+    "titleUrl": "https://music.youtube.com/watch?v=ob-73lHbwe4",
+    "subtitles": [
+      {
+        "name": "Hans Zimmer - Topic",
+        "url": "https://www.youtube.com/channel/UCfCNL5oajlQBAlyjWv1ChVw"
+      }
+    ],
+    "time": "2024-04-09T18:02:20.450Z",
+    "products": ["YouTube"],
+    "activityControls": ["YouTube watch history"]
+  },
+  {
+    "header": "YouTube Music",
+    "title": "Watched Chevaliers de Sangreal (Live / From The Da Vinci Code)",
+    "titleUrl": "https://music.youtube.com/watch?v=RPrgzUeZULQ",
+    "subtitles": [
+      {
+        "name": "Hans Zimmer - Topic",
+        "url": "https://www.youtube.com/channel/UCfCNL5oajlQBAlyjWv1ChVw"
+      }
+    ],
+    "time": "2024-04-09T18:00:28.119Z",
+    "products": ["YouTube"],
+    "activityControls": ["YouTube watch history"]
+  },
+  {
+    "header": "YouTube Music",
+    "title": "Watched First Step",
+    "titleUrl": "https://music.youtube.com/watch?v=55TYgbk4kZs",
+    "subtitles": [
+      {
+        "name": "Hans Zimmer - Topic",
+        "url": "https://www.youtube.com/channel/UCfCNL5oajlQBAlyjWv1ChVw"
+      }
+    ],
+    "time": "2024-04-09T17:58:43.012Z",
+    "products": ["YouTube"],
+    "activityControls": ["YouTube watch history"]
+  }
+]
